@@ -13,7 +13,11 @@ flask = "^3.0.3"
 nltk = "^3.9.1"
 plotly = "^5.24.1"
 sqlalchemy = "^2.0.36"
+ipykernel = "^6.29.5"
 
+
+[tool.poetry.group.dev.dependencies]
+ipykernel = "^6.29.5"
 
 [build-system]
 requires = ["poetry-core"]
