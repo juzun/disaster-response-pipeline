@@ -1,0 +1,38 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "Python Debugger: Current File",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "${file}",
+            "console": "integratedTerminal"
+        },
+        {
+            "name": "Python: Typer ETL pipeline run",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "disaster_response_pipeline/core/process_data.py",
+            "args": [
+                "--messages-filepath",
+                "data/messages.csv",
+                "--categories-filepath",
+                "data/categories.csv",
+                "--database-filepath",
+                "data/DisasterResponse"
+            ],
+        },
+        {
+            "name": "Python: Typer ML pipeline run",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "disaster_response_pipeline/core/train_classifier.py",
+            "args": [
+            ],
+        },
+    ]
+}
+

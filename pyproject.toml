@@ -14,6 +14,9 @@ nltk = "^3.9.1"
 plotly = "^5.24.1"
 sqlalchemy = "^2.0.36"
 ipykernel = "^6.29.5"
+structlog = "^24.4.0"
+typer = "^0.13.0"
+black = {extras = ["jupyter"], version = "^24.10.0"}
 
 
 [tool.poetry.group.dev.dependencies]

@@ -1,44 +1,75 @@
 import pandas as pd
-import sys
+import sqlalchemy
+import structlog
+import typer
 
 
-def load_data(messages_filepath, categories_filepath):
-    pass
+app = typer.Typer()
+log = structlog.get_logger()
 
 
-def clean_data(df):
-    pass
+def load_data(messages_filepath: str, categories_filepath: str) -> pd.DataFrame:
+    messages = pd.read_csv(messages_filepath)
+    categories = pd.read_csv(categories_filepath)
+    data_merged = messages.merge(right=categories, on="id", how="inner")
+    return data_merged
 
 
-def save_data(df, database_filename):
-    pass  
+def clean_data(data: pd.DataFrame) -> pd.DataFrame:
+    categories_split = data["categories"].str.split(pat=";", expand=True)
+    category_colnames = categories_split.iloc[0].str.split("-").str[0]
+    categories_split.columns = category_colnames
+    categories_split = categories_split.apply(
+        lambda col: col.str.split("-").str[1].astype(int)
+    )
+    data_expanded = pd.concat(
+        [data.drop(columns=["categories"]), categories_split], axis=1
+    )
+    data_expanded = data_expanded.drop_duplicates()
+
+    # "child_alone" column contains only zeros - it will be dropped.
+    data_expanded = data_expanded.drop(columns=["child_alone"])
+
+    # "related" column contains not only zeros and ones but also 2.
+    # It was discovered that when there is 2, all other target columns are 0.
+    # Therefore all the rows with related ==2 will be dropped (less than 200).
+    data_expanded = data_expanded[data_expanded["related"] != 2]
+
+    return data_expanded
 
 
-def main():
-    if len(sys.argv) == 4:
-
-        messages_filepath, categories_filepath, database_filepath = sys.argv[1:]
-
-        print('Loading data...\n    MESSAGES: {}\n    CATEGORIES: {}'
-              .format(messages_filepath, categories_filepath))
-        df = load_data(messages_filepath, categories_filepath)
-
-        print('Cleaning data...')
-        df = clean_data(df)
-        
-        print('Saving data...\n    DATABASE: {}'.format(database_filepath))
-        save_data(df, database_filepath)
-        
-        print('Cleaned data saved to database!')
-    
-    else:
-        print('Please provide the filepaths of the messages and categories '\
-              'datasets as the first and second argument respectively, as '\
-              'well as the filepath of the database to save the cleaned data '\
-              'to as the third argument. \n\nExample: python process_data.py '\
-              'disaster_messages.csv disaster_categories.csv '\
-              'DisasterResponse.db')
+def save_data(data: pd.DataFrame, database_filepath: str):
+    engine = sqlalchemy.create_engine(f"sqlite:///{database_filepath}.db")
+    data.to_sql("twitter_data", engine, index=False)
 
 
-if __name__ == '__main__':
-    main()
+@app.command()
+def process_data(
+    messages_filepath: str = typer.Option(  # noqa B008
+        help="Path to a CSV file containing messages. Example: data/messages.csv.",
+    ),
+    categories_filepath: str = typer.Option(  # noqa B008
+        help="Path to a CSV file containing categories. Example: data/categories.csv.",
+    ),
+    database_filepath: str = typer.Option(  # noqa B008
+        help="Path where resulting database shall be stored and its name. Example: data/DisasterResponse.",
+    ),
+):
+    log.info(
+        f"Loading data...\n    MESSAGES: {messages_filepath}\n    CATEGORIES: {categories_filepath}"
+    )
+    data_loaded = load_data(
+        messages_filepath=messages_filepath, categories_filepath=categories_filepath
+    )
+
+    log.info("Cleaning data...")
+    data_cleaned = clean_data(data=data_loaded)
+
+    log.info(f"Saving data...\n    DATABASE: {database_filepath}")
+    save_data(data=data_cleaned, database_filepath=database_filepath)
+
+    log.info(f"Cleaned data saved to database {database_filepath}.")
+
+
+if __name__ == "__main__":
+    app()
