@@ -1,59 +1,241 @@
-import sys
+# import libraries
+import nltk
 
 
-def load_data(database_filepath):
-    pass
+nltk.download(["punkt", "wordnet", "averaged_perceptron_tagger"])
+
+from typing import List, Tuple, Union
+from nltk.corpus import stopwords
+from nltk.stem import WordNetLemmatizer
+from nltk.tokenize import word_tokenize
+import numpy as np
+import pandas as pd
+import pickle
+import re
+from sklearn.compose import ColumnTransformer
+from sklearn.ensemble import RandomForestClassifier
+from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
+from sklearn.metrics import classification_report
+from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.multioutput import MultiOutputClassifier
+from sklearn.pipeline import FeatureUnion, Pipeline
+import sqlalchemy
+from sqlalchemy import create_engine
+import structlog
+import typer
+
+from disaster_response_pipeline.core.custom_transformers import GenreTransformer, StartingVerbExtractor
 
 
-def tokenize(text):
-    pass
+# Typer app for CLI commands
+app = typer.Typer()
+
+# Structlog logger for structured logging
+log = structlog.get_logger()
 
 
-def build_model():
-    pass
+def load_data(database_filepath: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
+    """
+    Load data from an SQLite database.
+
+    Args:
+        database_filepath (str): Path to the SQLite database.
+
+    Returns:
+        Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
+            - X (pd.DataFrame): DataFrame containing message text and genre.
+            - y (pd.DataFrame): DataFrame containing target categories.
+            - target_columns (List[str]): List of target category column names.
+    """
+    # Connect to the SQLite database
+    engine = create_engine(f"sqlite:///{database_filepath}.db")
+
+    # Load the first table from the database
+    df = pd.read_sql(f"select * from {sqlalchemy.inspect(engine).get_table_names()[0]}", engine)
+
+    # Identify target columns
+    target_columns = []
+    for col in df.columns:
+        if col not in ["id", "message", "genre", "original"]:
+            target_columns.append(col)
+
+    # Separate features (X) and targets (y)
+    X = df[["message", "genre"]]
+    y = df[target_columns]
+
+    return X, y, target_columns
 
 
-def evaluate_model(model, X_test, Y_test, category_names):
-    pass
+def tokenize(text: str) -> List[str]:
+    """
+    Tokenize and preprocess text data.
+
+    Args:
+        text (str): Input text to be tokenized.
+
+    Returns:
+        List[str]: List of cleaned and lemmatized tokens.
+    """
+    # Regex to identify URLs
+    url_regex = r"http[s]?://(?:[a-zA-Z]|[0-9]|[$-_@.&+]|[!*\(\),]|(?:%[0-9a-fA-F][0-9a-fA-F]))+"
+    detected_urls = re.findall(url_regex, text)
+
+    # Replace URLs with a placeholder
+    for url in detected_urls:
+        text = text.replace(url, "urlplaceholder")
+
+    # Tokenize the text into words
+    tokens = word_tokenize(text)
+
+    # Clean and lemmatize tokens, excluding stopwords
+    cleaned_tokens = [
+        WordNetLemmatizer().lemmatize(token).lower().strip()
+        for token in tokens
+        if token not in stopwords.words("english")
+    ]
+
+    return cleaned_tokens
 
 
-def save_model(model, model_filepath):
-    pass
+def build_model() -> Pipeline:
+    """
+    Build a machine learning pipeline for disaster response classification.
+
+    Returns:
+        Pipeline: A scikit-learn pipeline object.
+    """
+    # Define the pipeline structure
+    pipeline = Pipeline(
+        [
+            (
+                "features",
+                FeatureUnion(
+                    [
+                        # Text processing pipeline
+                        (
+                            "text_pipeline",
+                            Pipeline(
+                                [
+                                    (
+                                        "col_transformer",
+                                        ColumnTransformer(
+                                            [
+                                                (
+                                                    "vect",
+                                                    CountVectorizer(tokenizer=tokenize),
+                                                    "message",
+                                                ),
+                                            ]
+                                        ),
+                                    ),
+                                    ("tfidf", TfidfTransformer()),
+                                ]
+                            ),
+                        ),
+                        # Extract starting verb from messages
+                        (
+                            "starting_verb",
+                            StartingVerbExtractor(tokenizer=tokenize, messages_col_name="message"),
+                        ),
+                        # Encode genre information
+                        ("genre", GenreTransformer(genre_col_name="genre")),
+                    ]
+                ),
+            ),
+            # Multi-output classification using RandomForest
+            ("clf", MultiOutputClassifier(estimator=RandomForestClassifier())),
+        ]
+    )
+    return pipeline
 
 
-def train_test_split(x, y, test_size):
-    pass
+def evaluate_model(
+    model: Union[Pipeline, RandomizedSearchCV],
+    X_test: pd.DataFrame,
+    y_test: pd.DataFrame,
+    target_columns: List[str],
+) -> None:
+    """
+    Evaluate a trained model using test data.
 
+    Args:
+        model (Union[Pipeline, RandomizedSearchCV]): Trained model to evaluate.
+        X_test (pd.DataFrame): Test features.
+        y_test (pd.DataFrame): Test targets.
+        target_columns (List[str]): List of target category names.
+    """
+    # Predict the categories for test data
+    y_pred = model.predict(X_test)
 
-def main():
-    if len(sys.argv) == 3:
-        database_filepath, model_filepath = sys.argv[1:]
-        print("Loading data...\n    DATABASE: {}".format(database_filepath))
-        X, Y, category_names = load_data(database_filepath)
-        X_train, X_test, Y_train, Y_test = train_test_split(X, Y, test_size=0.2)
-
-        print("Building model...")
-        model = build_model()
-
-        print("Training model...")
-        model.fit(X_train, Y_train)
-
-        print("Evaluating model...")
-        evaluate_model(model, X_test, Y_test, category_names)
-
-        print("Saving model...\n    MODEL: {}".format(model_filepath))
-        save_model(model, model_filepath)
-
-        print("Trained model saved!")
-
-    else:
-        print(
-            "Please provide the filepath of the disaster messages database "
-            "as the first argument and the filepath of the pickle file to "
-            "save the model to as the second argument. \n\nExample: python "
-            "train_classifier.py ../data/DisasterResponse.db classifier.pkl"
+    # Generate classification report
+    report = pd.DataFrame(
+        classification_report(
+            y_pred=y_pred,
+            y_true=y_test,
+            target_names=target_columns,
+            output_dict=True,
+            zero_division=np.nan,
         )
+    ).transpose()
+
+    # Print the classification report
+    print(report)
+
+
+def save_model(model: Union[Pipeline, RandomizedSearchCV], model_filepath: str) -> None:
+    """
+    Save the trained model to a pickle file.
+
+    Args:
+        model (Union[Pipeline, RandomizedSearchCV]): Trained model to save.
+        model_filepath (str): Path to save the model (without extension).
+    """
+    with open(f"{model_filepath}.pkl", "wb") as file:
+        pickle.dump(model, file)
+
+
+@app.command()
+def main(
+    database_filepath: str = typer.Option(  # noqa B008
+        help="Path where the database shall be load from. Example: data/DisasterResponse.",
+    ),
+    model_filepath: str = typer.Option(  # noqa B008
+        help="Path where the trained model should be stored. Example: data/trained_model.",
+    ),
+) -> None:
+    """
+    Main CLI command to load data, build and train a model, evaluate, and save it.
+
+    Args:
+        database_filepath (str): Path to the database file.
+        model_filepath (str): Path to save the trained model.
+    """
+    # Log data loading process
+    log.info(f"Loading data...\n    DATABASE: {database_filepath}")
+    X, Y, target_columns = load_data(database_filepath=database_filepath)
+
+    # Split data into training and test sets
+    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+
+    # Building process
+    log.info("Building model...")
+    model = build_model()
+
+    # Train the model
+    log.info("Training model...")
+    model.fit(X=X_train, y=y_train)
+
+    # Evaluate the trained model
+    log.info("Evaluating model...")
+    evaluate_model(model=model, X_test=X_test, y_test=y_test, target_columns=target_columns)
+
+    # Save the trained model
+    log.info(f"Saving model...\n    MODEL: {model_filepath}")
+    save_model(model, model_filepath)
+
+    # Confirm successful save
+    log.info(f"Trained model saved in {model_filepath}.")
 
 
 if __name__ == "__main__":
-    main()
+    app()

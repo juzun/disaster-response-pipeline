@@ -1,21 +1,19 @@
+from typing import List
+from flask import Flask, render_template, request
+import joblib
 import json
-import plotly
-import pandas as pd
-
 from nltk.stem import WordNetLemmatizer
 from nltk.tokenize import word_tokenize
-
-from flask import Flask
-from flask import render_template, request, jsonify
+import pandas as pd
+import plotly
 from plotly.graph_objs import Bar
-from sklearn.externals import joblib
 from sqlalchemy import create_engine
 
 
 app = Flask(__name__)
 
 
-def tokenize(text):
+def tokenize(text: str) -> List[str]:
     tokens = word_tokenize(text)
     lemmatizer = WordNetLemmatizer()
 
@@ -27,18 +25,22 @@ def tokenize(text):
     return clean_tokens
 
 
+# database and model filepaths
+database_filepath = "data/DisasterResponse"
+model_filepath = "data/trained_model"
+
 # load data
-engine = create_engine("sqlite:///../data/YourDatabaseName.db")
+engine = create_engine(f"sqlite:///{database_filepath}.db")
 df = pd.read_sql_table("YourTableName", engine)
 
 # load model
-model = joblib.load("../models/your_model_name.pkl")
+model = joblib.load(f"{model_filepath}.pkl")
 
 
 # index webpage displays cool visuals and receives user input text for model
 @app.route("/")
 @app.route("/index")
-def index():
+def index() -> str:
 
     # extract data needed for visuals
     # TODO: Below is an example - modify to extract data for your own visuals
@@ -68,7 +70,7 @@ def index():
 
 # web page that handles user query and displays model results
 @app.route("/go")
-def go():
+def go() -> str:
     # save user input in query
     query = request.args.get("query", "")
 
@@ -77,12 +79,10 @@ def go():
     classification_results = dict(zip(df.columns[4:], classification_labels))
 
     # This will render the go.html Please see that file.
-    return render_template(
-        "go.html", query=query, classification_result=classification_results
-    )
+    return render_template("go.html", query=query, classification_result=classification_results)
 
 
-def main():
+def main() -> None:
     app.run(host="0.0.0.0", port=3001, debug=True)
 
 
