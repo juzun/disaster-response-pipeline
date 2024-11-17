@@ -3,10 +3,10 @@
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Project description](#description)
+- [Project description](#project-description)
 - [Instructions](#instructions)
 - [ML Pipeline](#ml-pipeline)
-- [Results analysis](#results)
+- [Results analysis](#results-analysis)
 
 
 ## Introduction
@@ -61,33 +61,9 @@ For anyone curious you can find all of these attempts in the notebooks directory
 
 
 ## Results analysis
-
 Following table shows classification report for the pipeline used in the code. From this table we can deduce some facts.
 
-Support is very helpful metrics. It shows us which target is literally supported and which one is not. For example "offer" has occured (meaning its value was 1) in the training dataset only 26 times. That tells us that even if the precision or recall values were great, it wouldn't of much help, since we can't be simple sure. In the other hand, categories like "related", "aid_related", "weather_related" or "micro_avg" have very strong support, therefore we can rely on these predictions more.
-
-Precision explains how much of predicted positive values were actually positive. Meaning, if precision is low, it could easily happen that we will clasify a message which is related to food not just to food-related agency, but also for example to clothing-related one. It is therefore important if we want to avoid these "false positives".
-
-Recall explains kind of vice-versa situation - how much of the actual positive values were correctly classified by the model. If recall would be low for some target, then for our food case, we wouldn't classify that case as a food case. We would perhaps classify it as another class, but not the real one. These are called "false negatives". They are undesirable especially in medicine - detecting a tumor is crucial, we can't fail on discovering this real positive. On the other hand, discovering a disease which patient doesn't have is not such a big deal.
-
-F1 score is a harmonic mean of precision and recall. It is therefore useful when both precision and recall are equally important.
-
-In our case, I say recall is the crucial one (and if not, then perhaps f1 score).
-
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -375,3 +351,13 @@ In our case, I say recall is the crucial one (and if not, then perhaps f1 score)
   </tbody>
 </table>
 </div>
+
+Support is very helpful metrics. It shows us which target is literally supported and which one is not. For example "offer" has occured (meaning its value was 1) in the training dataset only 26 times. That tells us that even if the precision or recall values were great, it wouldn't of much help, since we can't be simple sure. In the other hand, categories like "related", "aid_related", "weather_related" or "micro_avg" have very strong support, therefore we can rely on these predictions more.
+
+Precision explains how much of predicted positive values were actually positive. Meaning, if precision is low, it could easily happen that we will clasify a message which is related to food not just to food-related agency, but also for example to clothing-related one. It is therefore important if we want to avoid these "false positives".
+
+Recall explains kind of vice-versa situation - how much of the actual positive values were correctly classified by the model. If recall would be low for some target, then for our food case, we wouldn't classify that case as a food case. We would perhaps classify it as another class, but not the real one. These are called "false negatives". They are undesirable especially in medicine - detecting a tumor is crucial, we can't fail on discovering this real positive. On the other hand, discovering a disease which patient doesn't have is not such a big deal.
+
+F1 score is a harmonic mean of precision and recall. It is therefore useful when both precision and recall are equally important.
+
+In our case, I would say recall is the crucial one (and if not, then perhaps f1 score).
