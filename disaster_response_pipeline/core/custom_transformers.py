@@ -1,4 +1,4 @@
-from typing import Callable, List
+from typing import Callable, List, Optional
 import nltk
 from nltk.tokenize import sent_tokenize
 import pandas as pd
@@ -11,7 +11,7 @@ class StartingVerbExtractor(BaseEstimator, TransformerMixin):
     in a sentence of a text message is a verb or the retweet indicator ('RT').
     """
 
-    def __init__(self, tokenizer: Callable[[str], List[str]], messages_col_name: str):
+    def __init__(self, tokenizer: Callable[[str], List[str]], messages_col_name: Optional[str] = None):
         """
         Initialize the StartingVerbExtractor with a tokenizer and column name.
 
@@ -77,15 +77,17 @@ class StartingVerbExtractor(BaseEstimator, TransformerMixin):
             pd.DataFrame: A DataFrame with a single column containing the feature
                           (True/False) for each message.
         """
+        # Try to apply the starting_verb method to the specified column
         try:
-            # Apply the starting_verb method to the specified column
-            X_tagged = X[self.messages_col_name].apply(self.starting_verb)
+            if not isinstance(X, pd.Series):
+                X_tagged = X[self.messages_col_name].apply(self.starting_verb)
+            else:
+                X_tagged = X.apply(self.starting_verb)
+        # Raise a KeyError if the column name is incorrect
         except KeyError as error_message:
-            # Raise a KeyError if the column name is incorrect
             raise KeyError(
                 f"Wrong column name for messages text was used: {error_message}. Available columns: {list(X.columns)}"
             )
-        # Return the feature as a DataFrame
         return pd.DataFrame(X_tagged)
 
 

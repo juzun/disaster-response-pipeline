@@ -12,7 +12,6 @@ import numpy as np
 import pandas as pd
 import pickle
 import re
-from sklearn.compose import ColumnTransformer
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics import classification_report
@@ -24,7 +23,7 @@ from sqlalchemy import create_engine
 import structlog
 import typer
 
-from disaster_response_pipeline.core.custom_transformers import GenreTransformer, StartingVerbExtractor
+from disaster_response_pipeline.core.custom_transformers import StartingVerbExtractor
 
 
 # Typer app for CLI commands
@@ -32,6 +31,9 @@ app = typer.Typer()
 
 # Structlog logger for structured logging
 log = structlog.get_logger()
+
+LEMMATIZER = WordNetLemmatizer()
+STOP_WORDS = stopwords.words("english")
 
 
 def load_data(database_filepath: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
@@ -43,7 +45,7 @@ def load_data(database_filepath: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[
 
     Returns:
         Tuple[pd.DataFrame, pd.DataFrame, List[str]]:
-            - X (pd.DataFrame): DataFrame containing message text and genre.
+            - X (pd.DataFrame): DataFrame containing message text.
             - y (pd.DataFrame): DataFrame containing target categories.
             - target_columns (List[str]): List of target category column names.
     """
@@ -60,7 +62,7 @@ def load_data(database_filepath: str) -> Tuple[pd.DataFrame, pd.DataFrame, List[
             target_columns.append(col)
 
     # Separate features (X) and targets (y)
-    X = df[["message", "genre"]]
+    X = df["message"]
     y = df[target_columns]
 
     return X, y, target_columns
@@ -89,9 +91,7 @@ def tokenize(text: str) -> List[str]:
 
     # Clean and lemmatize tokens, excluding stopwords
     cleaned_tokens = [
-        WordNetLemmatizer().lemmatize(token).lower().strip()
-        for token in tokens
-        if token not in stopwords.words("english")
+        LEMMATIZER.lemmatize(token).lower().strip() for token in tokens if token not in STOP_WORDS
     ]
 
     return cleaned_tokens
@@ -111,40 +111,19 @@ def build_model() -> Pipeline:
                 "features",
                 FeatureUnion(
                     [
-                        # Text processing pipeline
                         (
                             "text_pipeline",
                             Pipeline(
-                                [
-                                    (
-                                        "col_transformer",
-                                        ColumnTransformer(
-                                            [
-                                                (
-                                                    "vect",
-                                                    CountVectorizer(tokenizer=tokenize),
-                                                    "message",
-                                                ),
-                                            ]
-                                        ),
-                                    ),
-                                    ("tfidf", TfidfTransformer()),
-                                ]
+                                [("vect", CountVectorizer(tokenizer=tokenize)), ("tfidf", TfidfTransformer())]
                             ),
                         ),
-                        # Extract starting verb from messages
-                        (
-                            "starting_verb",
-                            StartingVerbExtractor(tokenizer=tokenize, messages_col_name="message"),
-                        ),
-                        # Encode genre information
-                        ("genre", GenreTransformer(genre_col_name="genre")),
+                        ("starting_verb", StartingVerbExtractor(tokenizer=tokenize)),
                     ]
                 ),
             ),
-            # Multi-output classification using RandomForest
             ("clf", MultiOutputClassifier(estimator=RandomForestClassifier())),
-        ]
+        ],
+        verbose=True,
     )
     return pipeline
 
@@ -212,10 +191,10 @@ def main(
     """
     # Log data loading process
     log.info(f"Loading data...\n    DATABASE: {database_filepath}")
-    X, Y, target_columns = load_data(database_filepath=database_filepath)
+    X, y, target_columns = load_data(database_filepath=database_filepath)
 
     # Split data into training and test sets
-    X_train, X_test, y_train, y_test = train_test_split(X, Y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
 
     # Building process
     log.info("Building model...")

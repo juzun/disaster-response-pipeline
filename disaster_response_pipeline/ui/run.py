@@ -1,28 +1,19 @@
-from typing import List
 from flask import Flask, render_template, request
 import joblib
 import json
-from nltk.stem import WordNetLemmatizer
-from nltk.tokenize import word_tokenize
 import pandas as pd
 import plotly
 from plotly.graph_objs import Bar
-from sqlalchemy import create_engine
+import sqlalchemy
+
+from disaster_response_pipeline.core.custom_transformers import (  # noqa
+    GenreTransformer,
+    StartingVerbExtractor,
+)
+from disaster_response_pipeline.core.train_classifier import LEMMATIZER, STOP_WORDS, tokenize  # noqa
 
 
 app = Flask(__name__)
-
-
-def tokenize(text: str) -> List[str]:
-    tokens = word_tokenize(text)
-    lemmatizer = WordNetLemmatizer()
-
-    clean_tokens = []
-    for tok in tokens:
-        clean_tok = lemmatizer.lemmatize(tok).lower().strip()
-        clean_tokens.append(clean_tok)
-
-    return clean_tokens
 
 
 # database and model filepaths
@@ -30,8 +21,8 @@ database_filepath = "data/DisasterResponse"
 model_filepath = "data/trained_model"
 
 # load data
-engine = create_engine(f"sqlite:///{database_filepath}.db")
-df = pd.read_sql_table("YourTableName", engine)
+engine = sqlalchemy.create_engine(f"sqlite:///{database_filepath}.db")
+df = pd.read_sql_table(sqlalchemy.inspect(engine).get_table_names()[0], engine)
 
 # load model
 model = joblib.load(f"{model_filepath}.pkl")
@@ -43,13 +34,15 @@ model = joblib.load(f"{model_filepath}.pkl")
 def index() -> str:
 
     # extract data needed for visuals
-    # TODO: Below is an example - modify to extract data for your own visuals
     genre_counts = df.groupby("genre").count()["message"]
     genre_names = list(genre_counts.index)
 
+    category_names = df.iloc[:, 4:].columns
+    category_boolean = (df.iloc[:, 4:] != 0).sum().values
+
     # create visuals
-    # TODO: Below is an example - modify to create your own visuals
     graphs = [
+        # GRAPH 1 - genre graph
         {
             "data": [Bar(x=genre_names, y=genre_counts)],
             "layout": {
@@ -57,7 +50,18 @@ def index() -> str:
                 "yaxis": {"title": "Count"},
                 "xaxis": {"title": "Genre"},
             },
-        }
+        },
+        # GRAPH 2 - category graph
+        {
+            "data": [Bar(x=category_names, y=category_boolean)],
+            "layout": {
+                "title": "Distribution of Message Categories",
+                "yaxis": {"title": "Count"},
+                "xaxis": {
+                    "title": "Category",
+                },
+            },
+        },
     ]
 
     # encode plotly graphs in JSON
@@ -75,7 +79,7 @@ def go() -> str:
     query = request.args.get("query", "")
 
     # use model to predict classification for query
-    classification_labels = model.predict([query])[0]
+    classification_labels = model.predict(pd.Series(query))[0]
     classification_results = dict(zip(df.columns[4:], classification_labels))
 
     # This will render the go.html Please see that file.

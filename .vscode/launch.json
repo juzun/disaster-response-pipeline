@@ -33,10 +33,25 @@
             "args": [
                 "--database-filepath",
                 "data/DisasterResponse",
-                "--model_filepath",
+                "--model-filepath",
                 "data/trained_model"
             ],
         },
+        {
+            "name": "Flask: App",
+            "type": "debugpy",
+            "request": "launch",
+            "program": "disaster_response_pipeline/ui/run.py",
+            "args": [],
+            "env": {
+                "FLASK_APP": "disaster_response_pipeline/ui/run.py",
+                "FLASK_ENV": "development",
+                "FLASK_DEBUG": "1"
+            },
+            "jinja": true,
+            "debugOptions": ["RedirectOutput"],
+            "console": "integratedTerminal",
+        }
     ]
 }
 
