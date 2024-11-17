@@ -104,19 +104,6 @@ F1 score is a harmonic mean of precision and recall. It is therefore useful when
 In our case, I say recall is the crucial one (and if not, then perhaps f1 score).
 
 <div>
-<style scoped>
-    .dataframe tbody tr th:only-of-type {
-        vertical-align: middle;
-    }
-
-    .dataframe tbody tr th {
-        vertical-align: top;
-    }
-
-    .dataframe thead th {
-        text-align: right;
-    }
-</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
