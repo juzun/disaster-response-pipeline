@@ -78,7 +78,7 @@ def save_data(data: pd.DataFrame, database_filepath: str) -> None:
     """
     # Create a SQLAlchemy engine to write data to SQLite
     engine = sqlalchemy.create_engine(f"sqlite:///{database_filepath}.db")
-    data.to_sql("twitter_data", engine, index=False)
+    data.to_sql(name="twitter_data", con=engine, index=False, if_exists="replace")
 
 
 @app.command()

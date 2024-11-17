@@ -3,29 +3,58 @@
 ## Table of Contents
 
 - [Introduction](#introduction)
-- [Project description](#project-description)
+- [Project description](#description)
+- [Repository overview](#repository-overview)
 - [Instructions](#instructions)
 - [ML Pipeline](#ml-pipeline)
-- [Results analysis](#results-analysis)
+- [Results analysis](#results)
 
 
 ## Introduction
-This repository contains a final project of the second course of Udacity Nanodegree Data Scientist.
-
-The task of this project was create a ML model classifying received messages from various disaster events. Based on this classification the message can be then forwarded to adequate disaster response agency.
+The task of this project was create a model classifying received messages from various disaster events. Based on this classification the message can be then forwarded to adequate disaster response agency.
 
 
 ## Project description
-This project consists mainly of three parts:
+This project consists of three main parts:
 
-- ETL Pipeline - load data from CSV, preprocesses them and stores in SQLite database.
-- ML Pipeline - build and train a model to classify messages, then store it.
+- ETL Pipeline - loads data from CSV, preprocesses them and stores into SQLite database.
+- ML Pipeline - builds and trains a model to classify messages, then store it (in `pickle` file).
 - Web application
-    - Load database and visualize some statistics from the source data.
-    - Load model and classify input message.
+    - Automatically loads database and visualizes some statistics from the source data.
+    - Automatically loads model and classifies user's input message.
 
 
-## Instructions:
+## Repository overview
+This repository contains a machine learning pipeline designed to process, classify, and visualize disaster response messages. It includes ETL (Extract, Transform, Load) and ML (Machine Learning) pipelines, a web-based user interface for exploring the results, and relevant scripts for data preprocessing and model training.
+
+### Directory and File Structure
+- `.vscode/`
+  - `launch.json` - Configuration for debugging in VS Code.
+- `data/`
+  - `categories.csv` - Dataset with disaster categories.
+  - `messages.csv` - Dataset with disaster response messages.
+  - `DisasterResponse.db` - SQLite database created during the ETL process.
+  - `trained_model.pkl` - Serialized model file (trained classifier) - not present in repository due to its size. Users must generate it by themselves locally.
+- `disaster_response_pipeline/`
+  - `core/` - Core pipeline scripts
+    - `custom_transformers.py` - Custom preprocessing transformers for ML pipeline.
+    - `process_data.py` - ETL pipeline for data processing.
+    - `train_classifier.py` - ML pipeline to build and save the model.
+  - `ui/` - Web application files.
+    - `templates/` - HTML templates for the Flask application.
+      - `go.html`
+      - `master.html`
+    - `run.py` - Main script to run the Flask web application.
+- `notebooks/`
+  - `ETL Pipeline Preparation.ipynb` - Notebook for ETL pipeline development.
+  - `ML Pipeline Preparation.ipynb` - Notebook for ML pipeline development.
+  - `run.ipynb` - Notebook for running and testing the pipeline.
+- `pyproject.toml` - Project metadata and dependencies configuration for Poetry.
+- `README.md` - Project documentation.
+- `requirements.txt` - List of Python dependencies for other virtual environments managers.
+
+
+## Instructions
 1. Install virtual environment.\
     `poetry install`
     - If you are not using poetry, you can utilize `requirements.txt` file.
@@ -38,8 +67,8 @@ This project consists mainly of three parts:
         `python disaster_response_pipeline/core/train_classifier.py --database-filepath data/DisasterResponse --model_filepath data/trained_model`
         `python models/train_classifier.py data/DisasterResponse.db models/classifier.pkl`
 
-3. Run the following command in the app's directory to run the web app.
-    `python run.py`
+3. Run the following command to run the web app.\
+    `python disaster_response_pipeline/ui/run.py`
 
 4. Go to http://0.0.0.0:3001/
 
@@ -55,15 +84,39 @@ During the creation of pipeline, several options were considered and compared. F
 
 Comparison between model with and without a transformer analyzing whether first word is a verb or similar. Based on precision and recall metrics, the one with transforer was chosen.
 
-After the training of the pipeline, grid search was performed as well as randomized search (both with cross validation). These were tested for a low number of parameters since it is computationally very demanding. Best results were reached using randomized search with parameters about maximal tree depth and number of trees in random forest method. But all of these attempts were always less precise then just a hollow pipeline, therefore cross validation wasn't included in the final code.
+After the training of the pipeline, grid search was performed as well as randomized search (both with cross validation). These were tested for a low number of parameters since it is computationally very demanding. Best results were reached using randomized search with parameters about maximal tree depth and number of trees in random forest method. All of these attempts were always less precise than just the pipeline itself. But since it was a task to include that, it is appended in the model building part.
 
 For anyone curious you can find all of these attempts in the notebooks directory, in `ML Pipeline Preparation.ipynb` file.
 
 
 ## Results analysis
+
 Following table shows classification report for the pipeline used in the code. From this table we can deduce some facts.
 
+Support is very helpful metrics. It shows us which target is literally supported and which one is not. For example "offer" has occured (meaning its value was 1) in the training dataset only 26 times. That tells us that even if the precision or recall values were great, it wouldn't of much help, since we can't be simple sure. In the other hand, categories like "related", "aid_related", "weather_related" or "micro_avg" have very strong support, therefore we can rely on these predictions more.
+
+Precision explains how much of predicted positive values were actually positive. Meaning, if precision is low, it could easily happen that we will clasify a message which is related to food not just to food-related agency, but also for example to clothing-related one. It is therefore important if we want to avoid these "false positives".
+
+Recall explains kind of vice-versa situation - how much of the actual positive values were correctly classified by the model. If recall would be low for some target, then for our food case, we wouldn't classify that case as a food case. We would perhaps classify it as another class, but not the real one. These are called "false negatives". They are undesirable especially in medicine - detecting a tumor is crucial, we can't fail on discovering this real positive. On the other hand, discovering a disease which patient doesn't have is not such a big deal.
+
+F1 score is a harmonic mean of precision and recall. It is therefore useful when both precision and recall are equally important.
+
+In our case, I say recall is the crucial one (and if not, then perhaps f1 score).
+
 <div>
+<style scoped>
+    .dataframe tbody tr th:only-of-type {
+        vertical-align: middle;
+    }
+
+    .dataframe tbody tr th {
+        vertical-align: top;
+    }
+
+    .dataframe thead th {
+        text-align: right;
+    }
+</style>
 <table border="1" class="dataframe">
   <thead>
     <tr style="text-align: right;">
@@ -351,13 +404,3 @@ Following table shows classification report for the pipeline used in the code. F
   </tbody>
 </table>
 </div>
-
-Support is very helpful metrics. It shows us which target is literally supported and which one is not. For example "offer" has occured (meaning its value was 1) in the training dataset only 26 times. That tells us that even if the precision or recall values were great, it wouldn't of much help, since we can't be simple sure. In the other hand, categories like "related", "aid_related", "weather_related" or "micro_avg" have very strong support, therefore we can rely on these predictions more.
-
-Precision explains how much of predicted positive values were actually positive. Meaning, if precision is low, it could easily happen that we will clasify a message which is related to food not just to food-related agency, but also for example to clothing-related one. It is therefore important if we want to avoid these "false positives".
-
-Recall explains kind of vice-versa situation - how much of the actual positive values were correctly classified by the model. If recall would be low for some target, then for our food case, we wouldn't classify that case as a food case. We would perhaps classify it as another class, but not the real one. These are called "false negatives". They are undesirable especially in medicine - detecting a tumor is crucial, we can't fail on discovering this real positive. On the other hand, discovering a disease which patient doesn't have is not such a big deal.
-
-F1 score is a harmonic mean of precision and recall. It is therefore useful when both precision and recall are equally important.
-
-In our case, I would say recall is the crucial one (and if not, then perhaps f1 score).

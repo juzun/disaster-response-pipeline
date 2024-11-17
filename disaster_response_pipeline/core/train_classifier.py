@@ -15,7 +15,7 @@ import re
 from sklearn.ensemble import RandomForestClassifier
 from sklearn.feature_extraction.text import CountVectorizer, TfidfTransformer
 from sklearn.metrics import classification_report
-from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.model_selection import GridSearchCV, train_test_split
 from sklearn.multioutput import MultiOutputClassifier
 from sklearn.pipeline import FeatureUnion, Pipeline
 import sqlalchemy
@@ -97,7 +97,7 @@ def tokenize(text: str) -> List[str]:
     return cleaned_tokens
 
 
-def build_model() -> Pipeline:
+def build_model() -> GridSearchCV:
     """
     Build a machine learning pipeline for disaster response classification.
 
@@ -125,11 +125,21 @@ def build_model() -> Pipeline:
         ],
         verbose=True,
     )
-    return pipeline
+
+    # Define parameters to iterate through during grid search
+    param_grid = {
+        "clf__estimator__n_estimators": [100, 200],
+        "clf__estimator__max_depth": [None, 10, 30],
+    }
+
+    # Initiate grid search.
+    grid_search = GridSearchCV(estimator=pipeline, param_grid=param_grid, cv=5, n_jobs=-1)
+
+    return grid_search
 
 
 def evaluate_model(
-    model: Union[Pipeline, RandomizedSearchCV],
+    model: Union[Pipeline, GridSearchCV],
     X_test: pd.DataFrame,
     y_test: pd.DataFrame,
     target_columns: List[str],
@@ -138,7 +148,7 @@ def evaluate_model(
     Evaluate a trained model using test data.
 
     Args:
-        model (Union[Pipeline, RandomizedSearchCV]): Trained model to evaluate.
+        model (Union[Pipeline, GridSearchCV]): Trained model to evaluate.
         X_test (pd.DataFrame): Test features.
         y_test (pd.DataFrame): Test targets.
         target_columns (List[str]): List of target category names.
@@ -160,13 +170,16 @@ def evaluate_model(
     # Print the classification report
     print(report)
 
+    # Print the best parameters found by grid search.
+    print(model.best_params_)
 
-def save_model(model: Union[Pipeline, RandomizedSearchCV], model_filepath: str) -> None:
+
+def save_model(model: Union[Pipeline, GridSearchCV], model_filepath: str) -> None:
     """
     Save the trained model to a pickle file.
 
     Args:
-        model (Union[Pipeline, RandomizedSearchCV]): Trained model to save.
+        model (Union[Pipeline, GridSearchCV]): Trained model to save.
         model_filepath (str): Path to save the model (without extension).
     """
     with open(f"{model_filepath}.pkl", "wb") as file:
