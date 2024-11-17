@@ -65,12 +65,11 @@ This repository contains a machine learning pipeline designed to process, classi
         `python disaster_response_pipeline/core/process_data.py --messages-filepath data/messages.csv --categories-filepath data/categories.csv --database-filepath data/DisasterResponse`
     - To run ML pipeline that trains classifier and saves it\
         `python disaster_response_pipeline/core/train_classifier.py --database-filepath data/DisasterResponse --model_filepath data/trained_model`
-        `python models/train_classifier.py data/DisasterResponse.db models/classifier.pkl`
 
 3. Run the following command to run the web app.\
     `python disaster_response_pipeline/ui/run.py`
 
-4. Go to http://0.0.0.0:3001/
+4. Go to `http://0.0.0.0:3001/`
 
 5. In the web application:
     - One can see two bar graphs with counts of messages genres (direct, news, social) and counts of each target category.
